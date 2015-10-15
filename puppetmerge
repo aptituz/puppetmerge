@@ -1,0 +1,61 @@
+#!/usr/bin/env ruby
+
+require 'optparse'
+require 'ostruct'
+require 'highline/import'
+
+opts = OpenStruct.new
+debug = false
+source = '.'
+target = '.'
+
+opt_parser = OptionParser.new do |opt|
+  opt.banner = "Usage: puppetmerge [OPTIONS] source destination"
+   opt.separator  ""
+   opt.separator  "Options"
+
+   opt.on("--debug","Enable debug mode") do |debug|
+     debug = debug
+   end
+   
+   opt.on("-s", "--source SOURCEDIR", "Specify source directory (default: $PWD)") do |s|
+     source = File.absolute_path(s)
+   end
+
+   opt.on("-d", "--destination DESTDIR", "Specify destination directory (default: $PWD)") do |d|
+     target = File.absolute_path(d)
+   end
+   
+   opt.on("-h","--help","help") do
+     puts opt_parser
+   end
+end
+
+opt_parser.parse!
+
+if source == target
+  puts "source and target module are the same, that makes no sense"
+  Kernel.exit(1)
+end
+
+unless File.directory?(source)
+  puts "specified source directory `%s' is not a directory" % source
+  Kernel.exit(1)
+end
+
+unless File.directory?(target)
+  puts "specified destination directory `%s' is not a directory" % target
+  Kernel.exit(1)
+end
+
+puts File.join(source, "manifests", "init.pp" )
+unless File.exists?(File.join(source, "manifests", "init.pp" ))
+  puts "specified source does not have an init.pp - wrong path?"
+  Kernel.exit(1)
+end
+
+unless File.exists?(File.join(target, "manifests", "init.pp"))
+  unless agree("specified target does not have an init.pp - continue? (y|N)") { |q| q.default = "no" }
+    Kernel.exit(1)
+  end
+end 
