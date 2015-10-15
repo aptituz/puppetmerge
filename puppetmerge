@@ -2,18 +2,35 @@
 
 require 'optparse'
 require 'highline/import'
+require 'find'
+require 'fileutils'
+require 'diffy'
 
 debug = false
 source = '.'
 target = '.'
+copy_new = false
+flags = {}
 
 opt_parser = OptionParser.new do |opt|
   opt.banner = "Usage: puppetmerge [OPTIONS] source destination"
    opt.separator  ""
    opt.separator  "Options"
 
-   opt.on("--debug","Enable debug mode") do |debug|
-     debug = debug
+   opt.on("--debug","Enable debug mode") do |arg|
+     debug = arg
+   end
+   
+   opt.on("--verbose", "Be verbose") do |arg|
+     flags[:verbose] = arg
+   end
+   
+   opt.on("--noop", "Do not actually do anything") do |arg|
+     flags[:noop] = arg
+   end
+   
+   opt.on("--copy-new", "Copy new files without confirmation") do |arg|
+     copy_new = arg
    end
    
    opt.on("-s", "--source SOURCEDIR", "Specify source directory (default: $PWD)") do |s|
@@ -56,4 +73,48 @@ unless File.exists?(File.join(target, "manifests", "init.pp"))
   unless agree("specified target does not have an init.pp - continue? (y|N)") { |q| q.default = "no" }
     Kernel.exit(1)
   end
-end 
+end
+
+def copy(src, dest, flags)
+  parent = File.dirname(dest)
+  unless File.exist?(parent)
+    FileUtils.mkdir_p(parent, flags)
+  end
+  FileUtils.cp(src, dest, flags)
+end
+
+
+Diffy::Diff.default_options.merge!(
+  :source => 'files',
+  :diff   => '-u 5 -w',
+  :include_diff_info => true
+)
+ 
+Find.find(source) do |path|
+  if FileTest.directory?(path)
+    if File.basename(path) =~ /(.svn|.git)/
+      Find.prune
+    end
+  else
+    relpath = path.sub(source + '/', '')
+    otherpath = File.join(target, relpath)
+    puts "testing #{relpath} against #{otherpath}"
+    if File.exists?(otherpath)      
+      if FileUtils.compare_file(path, otherpath)
+        puts "file identical, next" if debug
+        next
+      else
+        puts "file #{otherpath} different" if debug
+        puts Diffy::Diff.new(path, otherpath).diff
+        #FIXME: Show diff
+      end
+    else
+      if copy_new then
+        copy(path, otherpath, flags)
+      end
+        
+      puts "file #{relpath} not existent in destination directory" if debug
+    end
+  end
+
+end
