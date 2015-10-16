@@ -13,6 +13,7 @@ opts.target = '.'
 opts.copy_new = false
 opts.debug = false
 opts.flags = {}
+opts.diff_args = ['-w']
 
 opt_parser = OptionParser.new do |opt|
   opt.banner = "Usage: puppetmerge [OPTIONS] source destination"
@@ -31,6 +32,10 @@ opt_parser = OptionParser.new do |opt|
      opts.flags[:noop] = arg
    end
    
+   opt.on("--diff-args ARGS", "Specify additional arguments to diff cmd") do |args|
+     opts.diff_args << args
+   end
+
    opt.on("--copy-new", "Copy new files without confirmation") do |arg|
      opts.copy_new = arg
    end
@@ -98,7 +103,7 @@ end
 
 Diffy::Diff.default_options.merge!(
   :source => 'files',
-  :diff   => '-uw',
+  :diff   => opts.diff_args,
   :include_diff_info => true,
   :default_format => :color
 )
