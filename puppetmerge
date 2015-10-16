@@ -222,13 +222,6 @@ find_source_files(opts) do |ourpath, our_relpath, otherpath|
         puts diff
         puts "affected file: #{our_relpath}"
         copy_file = (file_is_new) ? accept_new_file? : accept_diff?
-        #else
-        #if opts.copy_new
-        #  copy_file = true
-        #else
-          # FIXME: this special case is dumb - no possibility to see the content
-         # copy_file = agree("File #{our_relpath} is new on destination - copy? (yes, no)")
-        #end
       end
 
       if copy_file == 'yes' or copy_file == true
