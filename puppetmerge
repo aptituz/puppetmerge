@@ -86,10 +86,12 @@ end
 
 Diffy::Diff.default_options.merge!(
   :source => 'files',
-  :diff   => '-u 5 -w',
-  :include_diff_info => true
+  :diff   => '-uw',
+  :include_diff_info => true,
+  :default_format => :color
 )
- 
+Diffy::Diff.default_format = :color
+
 Find.find(source) do |path|
   if FileTest.directory?(path)
     if File.basename(path) =~ /(.svn|.git)/
