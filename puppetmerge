@@ -1,16 +1,18 @@
 #!/usr/bin/env ruby
 
 require 'optparse'
+require 'ostruct'
 require 'highline/import'
 require 'find'
 require 'fileutils'
 require 'diffy'
 
-debug = false
-source = '.'
-target = '.'
-copy_new = false
-flags = {}
+opts = OpenStruct.new
+opts.source = '.'
+opts.target = '.'
+opts.copy_new = false
+opts.debug = false
+opts.flags = {}
 
 opt_parser = OptionParser.new do |opt|
   opt.banner = "Usage: puppetmerge [OPTIONS] source destination"
@@ -18,27 +20,27 @@ opt_parser = OptionParser.new do |opt|
    opt.separator  "Options"
 
    opt.on("--debug","Enable debug mode") do |arg|
-     debug = arg
+     opts.debug = arg
    end
    
    opt.on("--verbose", "Be verbose") do |arg|
-     flags[:verbose] = arg
+     opts.flags[:verbose] = arg
    end
    
    opt.on("--noop", "Do not actually do anything") do |arg|
-     flags[:noop] = arg
+     opts.flags[:noop] = arg
    end
    
    opt.on("--copy-new", "Copy new files without confirmation") do |arg|
-     copy_new = arg
+     opts.copy_new = arg
    end
    
    opt.on("-s", "--source SOURCEDIR", "Specify source directory (default: $PWD)") do |s|
-     source = File.absolute_path(s)
+     opts.source = File.absolute_path(s)
    end
 
    opt.on("-d", "--destination DESTDIR", "Specify destination directory (default: $PWD)") do |d|
-     target = File.absolute_path(d)
+     opts.target = File.absolute_path(d)
    end
    
    opt.on("-h","--help","help") do
@@ -48,30 +50,46 @@ end
 
 opt_parser.parse!
 
-if source == target
+if opts.source == opts.target
   puts "source and target module are the same, that makes no sense"
   Kernel.exit(1)
 end
 
-unless File.directory?(source)
-  puts "specified source directory `%s' is not a directory" % source
+unless File.directory?(opts.source)
+  puts "specified source directory `%s' is not a directory" % opts.source
   Kernel.exit(1)
 end
 
-unless File.directory?(target)
-  puts "specified destination directory `%s' is not a directory" % target
+unless File.directory?(opts.target)
+  puts "specified destination directory `%s' is not a directory" % opts.target
   Kernel.exit(1)
 end
 
-puts File.join(source, "manifests", "init.pp" )
-unless File.exists?(File.join(source, "manifests", "init.pp" ))
+unless File.exists?(File.join(opts.source, "manifests", "init.pp" ))
   puts "specified source does not have an init.pp - wrong path?"
   Kernel.exit(1)
 end
 
-unless File.exists?(File.join(target, "manifests", "init.pp"))
+unless File.exists?(File.join(opts.target, "manifests", "init.pp"))
   unless agree("specified target does not have an init.pp - continue? (y|N)") { |q| q.default = "no" }
     Kernel.exit(1)
+  end
+end
+
+def find_source_files(opts)
+  if not block_given?
+    raise ArgumentError('find_soure_files requires a block')
+  end
+  Find.find(opts.source) do |path|
+    relpath = path.sub(opts.source + '/', '')
+    otherpath = File.join(opts.target, relpath)
+    if FileTest.directory?(path)
+      if File.basename(path) =~ /(.svn|.git)/
+        Find.prune
+      end
+    else
+      yield path, relpath, otherpath
+    end
   end
 end
 
@@ -84,6 +102,7 @@ def copy(src, dest, flags)
 end
 
 
+
 Diffy::Diff.default_options.merge!(
   :source => 'files',
   :diff   => '-uw',
@@ -92,21 +111,14 @@ Diffy::Diff.default_options.merge!(
 )
 Diffy::Diff.default_format = :color
 
-Find.find(source) do |path|
-  if FileTest.directory?(path)
-    if File.basename(path) =~ /(.svn|.git)/
-      Find.prune
-    end
-  else
-    relpath = path.sub(source + '/', '')
-    otherpath = File.join(target, relpath)
-    puts "testing #{relpath} against #{otherpath}"
+find_source_files(opts) do |path, relpath, otherpath|
+    puts "testing #{relpath} against #{otherpath}" if opts.flags[:verbose]
     if File.exists?(otherpath)      
       if FileUtils.compare_file(path, otherpath)
-        puts "file identical, next" if debug
+        puts "file identical, next" if opts.debug
         next
       else
-        puts "file #{otherpath} different" if debug
+        puts "file #{otherpath} different" if opts.debug
         puts Diffy::Diff.new(path, otherpath).diff
         #FIXME: Show diff
       end
@@ -115,8 +127,6 @@ Find.find(source) do |path|
         copy(path, otherpath, flags)
       end
         
-      puts "file #{relpath} not existent in destination directory" if debug
+      puts "file #{relpath} not existent in destination directory" if opts.debug
     end
   end
-
-end
