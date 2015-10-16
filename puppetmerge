@@ -13,7 +13,7 @@ opts.target = '.'
 opts.copy_new = false
 opts.debug = false
 opts.flags = {}
-opts.diff_args = ['-w']
+opts.diff_args = ['-wu']
 
 opt_parser = OptionParser.new do |opt|
   opt.banner = "Usage: puppetmerge [OPTIONS] source destination"
@@ -86,6 +86,10 @@ def find_source_files(opts)
       if File.basename(path) =~ /(.svn|.git)/
         Find.prune
       end
+      
+      if File.basename(path) =~ /\.orig$/
+        Find.prune
+      end
     else
       yield path, relpath, otherpath
     end
@@ -123,6 +127,57 @@ class PuppetDiffer < Diffy::Diff
   end
 end
 
+class PatchException < Exception
+end
+  
+
+def accept_diff?(character = nil)
+  ask "Accept different? (yes, no, edit)" do |q|
+    q.validate = /\Ay(?:es)?|no?|edit?\Z/i
+    q.responses[:not_valid]    = 'Please enter "yes", "no" or "edit".'
+    q.responses[:ask_on_error] = :question
+    q.character                = character
+    
+    yield q if block_given?
+  end
+end
+
+def edit_patch(diff)
+  if not block_given?
+    raise ArgumentError('find_soure_files requires a block')
+  end
+  
+  tmpfile = nil
+  begin
+    tmpfile = Tempfile.new('puppetmerge')
+    tmpfile.write(diff)
+    tmpfile.close
+    
+    system('editdiff', tmpfile.path)
+    origfile = tmpfile.path + ".orig"
+    if File.exists?(origfile)
+      puts "Removing origfile"
+        File.unlink(origfile)
+    end
+    
+    yield tmpfile
+  ensure
+    tmpfile.close
+    tmpfile.unlink
+  end
+end
+
+def apply_patch(path, patchfile)
+  # FIXME: Make this less dumb
+  if system('patch', path, patchfile).nil?
+    raise "unable to execute patch: " + $?.to_s
+  end
+  
+  if $?.exitstatus != 0
+    raise PatchException.new
+  end
+end
+
 PuppetDiffer.default_options.merge!(
   :source => 'files',
   :diff   => opts.diff_args,
@@ -143,8 +198,9 @@ find_source_files(opts) do |ourpath, our_relpath, otherpath|
 
     # no need to diff if file is not there
     if File.exists?(otherpath)
-      puts PuppetDiffer.new(ourpath, otherpath)
-      copy_file = agree("Accept difference? (yes, no)")
+      diff = PuppetDiffer.new(otherpath, ourpath)
+      puts diff
+      copy_file = accept_diff?
     else
       if opts.copy_new
         copy_file = true
@@ -153,7 +209,14 @@ find_source_files(opts) do |ourpath, our_relpath, otherpath|
       end
     end
 
-    if copy_file
+    if copy_file == 'yes'
       copy(ourpath, otherpath, opts.flags)
+    elsif copy_file == 'edit'
+      edit_patch(diff) do |patchfile|
+        
+        if File.exists?(patchfile.path)
+          apply_patch(otherpath, patchfile.path) 
+        end
+      end
     end
   end
