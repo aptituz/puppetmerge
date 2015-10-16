@@ -142,7 +142,7 @@ def accept_diff?(character = nil)
   end
 end
 
-def edit_and_apply_patch(diff, otherpath)
+def edit_and_apply_patch(diff, otherpath, opts)
   tmpfile = nil
   begin
     tmpfile = Tempfile.new('puppetmerge')
@@ -152,7 +152,9 @@ def edit_and_apply_patch(diff, otherpath)
     # FIXME: error handling?
     begin
       system('editdiff', tmpfile.path)
-      apply_patch(otherpath, tmpfile.path)
+      unless opts.flags[:noop]
+        apply_patch(otherpath, tmpfile.path)
+      end
     rescue PatchException
       if agree "applying patch failed, edit again? (yes, no)"
         retry
@@ -217,7 +219,7 @@ find_source_files(opts) do |ourpath, our_relpath, otherpath|
       if copy_file == 'yes' or copy_file == true
         copy(ourpath, otherpath, opts.flags)
       elsif copy_file == 'edit'
-        edit_and_apply_patch(diff, otherpath)
+        edit_and_apply_patch(diff, otherpath, opts)
       end
     rescue PatchException => e
       retry
