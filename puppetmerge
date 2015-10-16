@@ -70,12 +70,6 @@ unless File.exists?(File.join(opts.source, "manifests", "init.pp" ))
   Kernel.exit(1)
 end
 
-unless File.exists?(File.join(opts.target, "manifests", "init.pp"))
-  unless agree("specified target does not have an init.pp - continue? (y|N)") { |q| q.default = "no" }
-    Kernel.exit(1)
-  end
-end
-
 def find_source_files(opts)
   if not block_given?
     raise ArgumentError('find_soure_files requires a block')
@@ -102,7 +96,6 @@ def copy(src, dest, flags)
 end
 
 
-
 Diffy::Diff.default_options.merge!(
   :source => 'files',
   :diff   => '-uw',
@@ -111,22 +104,29 @@ Diffy::Diff.default_options.merge!(
 )
 Diffy::Diff.default_format = :color
 
-find_source_files(opts) do |path, relpath, otherpath|
-    puts "testing #{relpath} against #{otherpath}" if opts.flags[:verbose]
-    if File.exists?(otherpath)      
-      if FileUtils.compare_file(path, otherpath)
-        puts "file identical, next" if opts.debug
-        next
-      else
-        puts "file #{otherpath} different" if opts.debug
-        puts Diffy::Diff.new(path, otherpath).diff
-        #FIXME: Show diff
-      end
+find_source_files(opts) do |ourpath, our_relpath, otherpath| 
+    puts "testing #{ourpath} against #{otherpath}" if opts.flags[:verbose]
+
+    copy_file = false
+    # skip over identical files
+    if File.exists?(otherpath) and FileUtils.compare_file(ourpath, otherpath)
+      puts "file '#{our_relpath}' identical, next" if opts.debug
+      next
+    end
+
+    # no need to diff if file is not there
+    if File.exists?(otherpath)
+      puts Diffy::Diff.new(ourpath, otherpath).diff
+      copy_file = agree("Accept difference? (yes, no)")
     else
-      if copy_new then
-        copy(path, otherpath, flags)
+      if opts.copy_new
+        copy_file = true
+      else
+        copy_file = agree("File #{our_relpath} is new on destination - copy? (yes, no)")
       end
-        
-      puts "file #{relpath} not existent in destination directory" if opts.debug
+    end
+
+    if copy_file
+      copy(ourpath, otherpath, opts.flags)
     end
   end
