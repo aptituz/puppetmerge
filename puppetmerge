@@ -132,7 +132,7 @@ end
   
 
 def accept_diff?(character = nil)
-  ask "Accept different? (yes, no, edit)" do |q|
+  ask "Accept difference? (yes, no, edit)" do |q|
     q.validate = /\Ay(?:es)?|no?|edit?\Z/i
     q.responses[:not_valid]    = 'Please enter "yes", "no" or "edit".'
     q.responses[:ask_on_error] = :question
@@ -142,25 +142,30 @@ def accept_diff?(character = nil)
   end
 end
 
-def edit_patch(diff)
-  if not block_given?
-    raise ArgumentError('find_soure_files requires a block')
-  end
-  
+def edit_and_apply_patch(diff, otherpath)
   tmpfile = nil
   begin
     tmpfile = Tempfile.new('puppetmerge')
     tmpfile.write(diff)
     tmpfile.close
     
-    system('editdiff', tmpfile.path)
+    # FIXME: error handling?
+    begin
+      system('editdiff', tmpfile.path)
+      apply_patch(otherpath, tmpfile.path)
+    rescue PatchException
+      if agree "applying patch failed, edit again? (yes, no)"
+        retry
+      else
+        raise PatchException
+      end
+    end 
+
     origfile = tmpfile.path + ".orig"
     if File.exists?(origfile)
       puts "Removing origfile"
         File.unlink(origfile)
     end
-    
-    yield tmpfile
   ensure
     tmpfile.close
     tmpfile.unlink
@@ -168,7 +173,6 @@ def edit_patch(diff)
 end
 
 def apply_patch(path, patchfile)
-  # FIXME: Make this less dumb
   if system('patch', path, patchfile).nil?
     raise "unable to execute patch: " + $?.to_s
   end
@@ -189,34 +193,33 @@ Diffy::Diff.default_format = :color
 find_source_files(opts) do |ourpath, our_relpath, otherpath| 
     puts "testing #{ourpath} against #{otherpath}" if opts.flags[:verbose]
 
-    copy_file = false
-    # skip over identical files
-    if File.exists?(otherpath) and FileUtils.compare_file(ourpath, otherpath)
-      puts "file '#{our_relpath}' identical, next" if opts.debug
-      next
-    end
-
-    # no need to diff if file is not there
-    if File.exists?(otherpath)
-      diff = PuppetDiffer.new(otherpath, ourpath)
-      puts diff
-      copy_file = accept_diff?
-    else
-      if opts.copy_new
-        copy_file = true
-      else
-        copy_file = agree("File #{our_relpath} is new on destination - copy? (yes, no)")
+    begin
+      copy_file = false
+      # skip over identical files
+      if File.exists?(otherpath) and FileUtils.compare_file(ourpath, otherpath)
+        puts "file '#{our_relpath}' identical, next" if opts.debug
+        next
       end
-    end
 
-    if copy_file == 'yes'
-      copy(ourpath, otherpath, opts.flags)
-    elsif copy_file == 'edit'
-      edit_patch(diff) do |patchfile|
-        
-        if File.exists?(patchfile.path)
-          apply_patch(otherpath, patchfile.path) 
+      # no need to diff if file is not there
+      if File.exists?(otherpath)
+        diff = PuppetDiffer.new(otherpath, ourpath)
+        puts diff
+        copy_file = accept_diff?
+      else
+        if opts.copy_new
+          copy_file = true
+        else
+          copy_file = agree("File #{our_relpath} is new on destination - copy? (yes, no)")
         end
       end
+
+      if copy_file == 'yes' or copy_file == true
+        copy(ourpath, otherpath, opts.flags)
+      elsif copy_file == 'edit'
+        edit_and_apply_patch(diff, otherpath)
+      end
+    rescue PatchException => e
+      retry
     end
-  end
+end
