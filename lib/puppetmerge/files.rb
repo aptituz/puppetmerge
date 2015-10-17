@@ -41,14 +41,18 @@ module PuppetMerge
       @newfiles ||= begin
         files = []
         sourcefiles.each do |path|
-          if File.exist?(File.join(destination, path))
+          dstpath = File.join(destination, path)
+          if File.exist?(dstpath)
             next
           else
             files << path
           end
+          yield File.join(source, path), path, dstpath if block_given?
         end
         files
       end
+
+
     end
 
     def changedfiles
@@ -57,7 +61,10 @@ module PuppetMerge
         (sourcefiles - newfiles).each do |path|
           srcfile = File.join(source, path)
           dstfile = File.join(destination, path)
-          files << path unless FileUtils.compare_file(srcfile, dstfile)
+          unless FileUtils.compare_file(srcfile, dstfile)
+            files << path
+            yield srcfile, path, dstfile if block_given?
+          end
         end
         files
       end
