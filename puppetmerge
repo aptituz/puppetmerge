@@ -1,5 +1,6 @@
 #!/usr/bin/env ruby
 
+require 'English'
 require 'optparse'
 require 'ostruct'
 require 'highline/import'
@@ -16,135 +17,149 @@ opts.flags = {}
 opts.diff_args = ['-Nwu']
 
 opt_parser = OptionParser.new do |opt|
-  opt.banner = "Usage: puppetmerge [OPTIONS] source destination"
-   opt.separator  ""
-   opt.separator  "Options"
+  opt.banner = 'Usage: puppetmerge [OPTIONS] source destination'
+  opt.separator ''
+  opt.separator 'Options'
 
-   opt.on("--debug","Enable debug mode") do |arg|
-     opts.debug = arg
-   end
-   
-   opt.on("--verbose", "Be verbose") do |arg|
-     opts.flags[:verbose] = arg
-   end
-   
-   opt.on("--noop", "Do not actually do anything") do |arg|
-     opts.flags[:noop] = arg
-   end
-   
-   opt.on("--diff-args ARGS", "Specify additional arguments to diff cmd") do |args|
-     opts.diff_args << args
-   end
+  opt.on('--debug', 'Enable debug mode') do |arg|
+    opts.debug = arg
+  end
 
-   opt.on("--copy-new", "Copy new files without confirmation") do |arg|
-     opts.copy_new = arg
-   end
-   
-   opt.on("-s", "--source SOURCEDIR", "Specify source directory (default: $PWD)") do |s|
-     opts.source = File.absolute_path(s)
-   end
+  opt.on('--verbose', 'Be verbose') do |arg|
+    opts.flags[:verbose] = arg
+  end
 
-   opt.on("-d", "--destination DESTDIR", "Specify destination directory (default: $PWD)") do |d|
-     opts.target = File.absolute_path(d)
-   end
-   
-   opt.on("-h","--help","help") do
-     puts opt_parser
-   end
+  opt.on('--noop', 'Do not actually do anything') do |arg|
+    opts.flags[:noop] = arg
+  end
+
+  opt.on('--diff-args ARGS',
+         'Specify additional arguments to diff cmd') do |args|
+    opts.diff_args << args
+  end
+
+  opt.on('--copy-new', 'Copy new files without confirmation') do |arg|
+    opts.copy_new = arg
+  end
+
+  opt.on('-s', '--source SOURCEDIR',
+         'Specify source directory (default: $PWD)') do |s|
+    opts.source = File.absolute_path(s)
+  end
+
+  opt.on('-d', '--destination DESTDIR',
+         'Specify destination directory (default: $PWD)') do |d|
+    opts.target = File.absolute_path(d)
+  end
+
+  opt.on('-h', '--help', 'help') do
+    puts opt_parser
+  end
 end
 
 opt_parser.parse!
 
 if opts.source == opts.target
-  puts "source and target module are the same, that makes no sense"
+  puts 'source and target module are the same, that makes no sense'
   Kernel.exit(1)
 end
 
 unless File.directory?(opts.source)
-  puts "specified source directory `%s' is not a directory" % opts.source
+  puts "specified source directory `#{opts.source}' is not a directory"
   Kernel.exit(1)
 end
 
 unless File.directory?(opts.target)
-  puts "specified destination directory `%s' is not a directory" % opts.target
+  puts "specified destination directory `#{opts.target}' is not a directory"
   Kernel.exit(1)
 end
 
-unless File.exists?(File.join(opts.source, "manifests", "init.pp" ))
-  puts "specified source does not have an init.pp - wrong path?"
+unless File.exist?(File.join(opts.source, 'manifests', 'init.pp'))
+  puts 'specified source does not have an init.pp - wrong path?'
   Kernel.exit(1)
+end
+
+def reject_path?(path)
+  if FileTest.directory?(path)
+    return true if File.basename(path) =~ /(.svn|.git)/
+  else
+    # FIXME: Can we avoid this? We are adding those files afterall
+    return true if File.basename(path) =~ /\.orig$/
+    # FIXME: Implement a blacklist mechanism for certain patterns
+  end
+  false
 end
 
 def find_source_files(opts)
-  if not block_given?
-    raise ArgumentError('find_soure_files requires a block')
-  end
+  fail ArgumentError('find_soure_files requires a block') unless block_given?
+
   Find.find(opts.source) do |path|
     relpath = path.sub(opts.source + '/', '')
     otherpath = File.join(opts.target, relpath)
-    if FileTest.directory?(path)
-      if File.basename(path) =~ /(.svn|.git)/
-        Find.prune
-      end
-      #FIXME: Implement a blacklist mechanism for certain patterns
-      
-      if File.basename(path) =~ /\.orig$/
-        Find.prune
-      end
-    else
-      yield path, relpath, otherpath
-    end
+
+    Find.prune if reject_path?(path)
+
+    yield path, relpath, otherpath unless FileTest.directory?(path)
   end
 end
 
 def copy(src, dest, flags)
   parent = File.dirname(dest)
-  unless File.exist?(parent)
-    FileUtils.mkdir_p(parent, flags)
-  end
+  FileUtils.mkdir_p(parent, flags) unless File.exist?(parent)
   FileUtils.cp(src, dest, flags)
 end
 
+# Diff class based on Diffy::Diff but with some additional error handling
 class PuppetDiffer < Diffy::Diff
   def diff
     # NOTE: We do not support all options of Diffy:Diff
     @diff ||= begin
       paths = [string1, string2]
 
-      puts [diff_bin,  *(diff_options + paths)].join(" ")
-      diff = Open3.popen3(diff_bin, *(diff_options + paths)) do |i, o, e|
+      puts [diff_bin, *(diff_options + paths)].join(' ')
+      diff = Open3.popen3(diff_bin, *(diff_options + paths)) do |_, o, e|
         err = e.read
-        unless err.empty?
-          raise "An error occured (retval #{$?.exitstatus}): #{err}"
-        end
+        fail "An error occured (retval #{$CHILD_STATUS.exitstatus}): #{err}" unless err.empty?
         o.read
       end
       diff.force_encoding('ASCII-8BIT') if diff.respond_to?(:valid_encoding?) && !diff.valid_encoding?
       if diff =~ /\A\s*\Z/ && !options[:allow_empty_diff]
-        diff = File.read(string1).gsub(/^/, " ")
+        diff = File.read(string1).gsub(/^/, ' ')
       end
       diff
     end
   end
 end
 
-class PatchException < Exception
-end
-  
+class PatchException < Exception; end
 
-def accept_diff?(message = 'Accept difference? (yes, no, edit)', character = nil)
+def accept_diff?(message = 'Accept difference? (yes, no, edit)', char = nil)
   ask message do |q|
     q.validate = /\Ay(?:es)?|no?|edit?\Z/i
     q.responses[:not_valid]    = 'Please enter "yes", "no" or "edit".'
     q.responses[:ask_on_error] = :question
-    q.character                = character
-    
+    q.character                = char
+
     yield q if block_given?
   end
 end
 
 def accept_new_file?
-  accept_diff?(message = 'Accept newly added file? (yes, no, edit)')
+  accept_diff?('Accept newly added file? (yes, no, edit)')
+end
+
+def edit_patch(path, otherpath, opts)
+  # FIXME: error handling?
+  begin
+    system('editdiff', path)
+    apply_patch(otherpath, path) unless opts.flags[:noop]
+  rescue PatchException
+    retry if agree 'applying patch failed, edit again? (yes, no)'
+    raise PatchException
+  end
+
+  origfile = tmpfile.path + '.orig'
+  File.unlink(origfile) if File.exist?(origfile)
 end
 
 def edit_and_apply_patch(diff, otherpath, opts)
@@ -153,26 +168,8 @@ def edit_and_apply_patch(diff, otherpath, opts)
     tmpfile = Tempfile.new('puppetmerge')
     tmpfile.write(diff)
     tmpfile.close
-    
-    # FIXME: error handling?
-    begin
-      system('editdiff', tmpfile.path)
-      unless opts.flags[:noop]
-        apply_patch(otherpath, tmpfile.path)
-      end
-    rescue PatchException
-      if agree "applying patch failed, edit again? (yes, no)"
-        retry
-      else
-        raise PatchException
-      end
-    end 
 
-    origfile = tmpfile.path + ".orig"
-    if File.exists?(origfile)
-      puts "Removing origfile"
-        File.unlink(origfile)
-    end
+    edit_patch(tmpfile.path, otherpath, opts)
   ensure
     tmpfile.close
     tmpfile.unlink
@@ -181,55 +178,56 @@ end
 
 def apply_patch(path, patchfile)
   if system('patch', path, patchfile).nil?
-    raise "unable to execute patch: " + $?.to_s
+    fail 'unable to execute patch: ' + $CHILD_STATUS.to_s
   end
-  
-  if $?.exitstatus != 0
-    raise PatchException.new
-  end
+
+  fail PatchException, 'applying patch failed' if $CHILD_STATUS.exitstatus != 0
 end
 
 PuppetDiffer.default_options.merge!(
-  :source => 'files',
-  :diff   => opts.diff_args,
-  :include_diff_info => true,
-  :default_format => :color
+  source: 'files',
+  diff: opts.diff_args,
+  include_diff_info: true,
+  default_format: :color
 )
 Diffy::Diff.default_format = :color
 
-find_source_files(opts) do |ourpath, our_relpath, otherpath| 
-    puts "testing #{ourpath} against #{otherpath}" if opts.flags[:verbose]
+find_source_files(opts) do |ourpath, our_relpath, otherpath|
+  puts "testing #{ourpath} against #{otherpath}" if opts.flags[:verbose]
 
-    begin
-      copy_file = false
-      # skip over identical files
-      if File.exists?(otherpath) and FileUtils.compare_file(ourpath, otherpath)
-        puts "file '#{our_relpath}' identical, next" if opts.debug
-        next
-      end
-
-      # no need to diff if file is not there
-      file_is_new = false
-      unless File.exists?(otherpath)
-        file_is_new = true
-      end
-      
-      if file_is_new and opts.copy_new
-        copy_file = true
-      else
-        diff = PuppetDiffer.new(otherpath, ourpath)
-        # FIXME: no point in showing an empty diff
-        puts diff
-        puts "affected file: #{our_relpath}"
-        copy_file = (file_is_new) ? accept_new_file? : accept_diff?
-      end
-
-      if copy_file == 'yes' or copy_file == true
-        copy(ourpath, otherpath, opts.flags)
-      elsif copy_file == 'edit'
-        edit_and_apply_patch(diff, otherpath, opts)
-      end
-    rescue PatchException => e
-      retry
+  begin
+    copy_file = false
+    # skip over identical files
+    if File.exist?(otherpath) && FileUtils.compare_file(ourpath, otherpath)
+      puts "file '#{our_relpath}' identical, next" if opts.debug
+      next
     end
+
+    # no need to diff if file is not there
+    if File.exist?(otherpath)
+      file_is_new = false
+    else
+      file_is_new = true
+    end
+
+    #FIXME: Showing diff for new files is buggy if parent directory does not exist
+
+    if file_is_new && opts.copy_new
+      copy_file = true
+    else
+      diff = PuppetDiffer.new(otherpath, ourpath)
+      # FIXME: no point in showing an empty diff
+      puts diff
+      puts "affected file: #{our_relpath}"
+      copy_file = (file_is_new) ? accept_new_file? : accept_diff?
+    end
+
+    if copy_file == 'yes' || copy_file == true
+      copy(ourpath, otherpath, opts.flags)
+    elsif copy_file == 'edit'
+      edit_and_apply_patch(diff, otherpath, opts)
+    end
+  rescue PatchException
+    retry
+  end
 end
