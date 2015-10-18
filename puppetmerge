@@ -8,6 +8,9 @@ require 'find'
 require 'fileutils'
 require 'diffy'
 
+$LOAD_PATH.unshift File.join(File.dirname(__FILE__), *%w[lib])
+require 'puppetmerge/files'
+
 opts = OpenStruct.new
 opts.source = '.'
 opts.target = '.'
@@ -79,30 +82,6 @@ unless File.exist?(File.join(opts.source, 'manifests', 'init.pp'))
   Kernel.exit(1)
 end
 
-def reject_path?(path)
-  if FileTest.directory?(path)
-    return true if File.basename(path) =~ /(.svn|.git)/
-  else
-    # FIXME: Can we avoid this? We are adding those files afterall
-    return true if File.basename(path) =~ /\.orig$/
-    # FIXME: Implement a blacklist mechanism for certain patterns
-  end
-  false
-end
-
-def find_source_files(opts)
-  fail ArgumentError('find_soure_files requires a block') unless block_given?
-
-  Find.find(opts.source) do |path|
-    relpath = path.sub(opts.source + '/', '')
-    otherpath = File.join(opts.target, relpath)
-
-    Find.prune if reject_path?(path)
-
-    yield path, relpath, otherpath unless FileTest.directory?(path)
-  end
-end
-
 def copy(src, dest, flags)
   parent = File.dirname(dest)
   FileUtils.mkdir_p(parent, flags) unless File.exist?(parent)
@@ -144,10 +123,6 @@ def accept_diff?(message = 'Accept difference? (yes, no, edit)', char = nil)
   end
 end
 
-def accept_new_file?
-  accept_diff?('Accept newly added file? (yes, no, edit)')
-end
-
 def edit_patch(path, otherpath, opts)
   # FIXME: error handling?
   begin
@@ -158,8 +133,8 @@ def edit_patch(path, otherpath, opts)
     raise PatchException
   end
 
-  origfile = tmpfile.path + '.orig'
-  File.unlink(origfile) if File.exist?(origfile)
+  #origfile = tmpfile.path + '.orig'
+  #File.unlink(origfile) if File.exist?(origfile)
 end
 
 def edit_and_apply_patch(diff, otherpath, opts)
@@ -192,40 +167,33 @@ PuppetDiffer.default_options.merge!(
 )
 Diffy::Diff.default_format = :color
 
-find_source_files(opts) do |ourpath, our_relpath, otherpath|
-  puts "testing #{ourpath} against #{otherpath}" if opts.flags[:verbose]
+sourcefiles = PuppetMerge::Files.new(opts.source, opts.target)
 
+sourcefiles.newfiles do |file|
+  copy_file = false
+  if opts.copy_new
+    copy_file = true
+  else
+    File.open(file).each { |line| puts "+" + line }
+    puts "File #{file.relative_path} is new."
+    copy_file = true if agree("Accept new file? (yes, no)")
+  end
+
+  copy(file, file.target, opts[:flags]) if copy_file
+end
+
+sourcefiles.changedfiles do |file|
   begin
-    copy_file = false
-    # skip over identical files
-    if File.exist?(otherpath) && FileUtils.compare_file(ourpath, otherpath)
-      puts "file '#{our_relpath}' identical, next" if opts.debug
-      next
-    end
+    diff = PuppetDiffer.new(file.target, file.to_s)
+    # FIXME: no point in showing an empty diff
+    puts diff
+    puts "affected file: #{file.relative_path}"
+    response = accept_diff?
 
-    # no need to diff if file is not there
-    if File.exist?(otherpath)
-      file_is_new = false
-    else
-      file_is_new = true
-    end
-
-    #FIXME: Showing diff for new files is buggy if parent directory does not exist
-
-    if file_is_new && opts.copy_new
-      copy_file = true
-    else
-      diff = PuppetDiffer.new(otherpath, ourpath)
-      # FIXME: no point in showing an empty diff
-      puts diff
-      puts "affected file: #{our_relpath}"
-      copy_file = (file_is_new) ? accept_new_file? : accept_diff?
-    end
-
-    if copy_file == 'yes' || copy_file == true
-      copy(ourpath, otherpath, opts.flags)
-    elsif copy_file == 'edit'
-      edit_and_apply_patch(diff, otherpath, opts)
+    if response == 'yes'
+      copy(file, file.target, opts[:flags])
+    elsif response == 'edit'
+      edit_and_apply_patch(diff, file.target, opts)
     end
   rescue PatchException
     retry
