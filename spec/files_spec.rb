@@ -13,7 +13,7 @@ describe PuppetMerge::Files do
     end
 
     it "contains all expected entries" do
-      expect(@filefinder.sourcefiles).to contain_exactly('manifests/init.pp', 'manifests/params.pp', 'manifests/subclass.pp')
+      expect(@filefinder.sourcefiles.map { |p| p.relative_path }).to contain_exactly('manifests/init.pp', 'manifests/params.pp', 'manifests/subclass.pp')
     end
 
   end
@@ -24,11 +24,11 @@ describe PuppetMerge::Files do
     end
 
     it "contains file which is not in destination module" do
-      expect(@filefinder.newfiles).to include('manifests/params.pp')
+      expect(@filefinder.newfiles.map { |p| p.relative_path }).to include('manifests/params.pp')
     end
 
     it "does not contain file which is in both modules" do
-      expect(@filefinder.newfiles).not_to include('manifests/init.pp')
+      expect(@filefinder.newfiles.map { |p| p.relative_path }).not_to include('manifests/init.pp')
     end
   end
 
@@ -42,7 +42,7 @@ describe PuppetMerge::Files do
     end
 
     it "contains only files which are different between source and dest" do
-      expect(@filefinder.changedfiles).to contain_exactly('manifests/init.pp')
+      expect(@filefinder.changedfiles.map { |p| p.relative_path }).to contain_exactly('manifests/init.pp')
     end
   end
 

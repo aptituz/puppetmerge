@@ -1,4 +1,5 @@
 require 'find'
+require 'puppetmerge/modulefile'
 
 module PuppetMerge
   # This class holds infos about files found in a source and destination directory
@@ -30,7 +31,9 @@ module PuppetMerge
         files = []
         Find.find(source) do |path|
           Find.prune && next if reject_path?(path)
-          files << relpath(path) unless FileTest.directory?(path)
+          path = PuppetMerge::ModuleFile.new(path, source, destination)
+          files << path unless FileTest.directory?(path)
+          yield path if block_given?
         end
         files
       end
@@ -40,14 +43,13 @@ module PuppetMerge
     def newfiles
       @newfiles ||= begin
         files = []
-        sourcefiles.each do |path|
-          dstpath = File.join(destination, path)
-          if File.exist?(dstpath)
+        sourcefiles.each do |modfile|
+          if File.exist?(modfile.target)
             next
           else
-            files << path
+            files << modfile
           end
-          yield File.join(source, path), path, dstpath if block_given?
+          yield modfile if block_given?
         end
         files
       end
@@ -58,12 +60,10 @@ module PuppetMerge
     def changedfiles
       @changedfiles ||= begin
         files = []
-        (sourcefiles - newfiles).each do |path|
-          srcfile = File.join(source, path)
-          dstfile = File.join(destination, path)
-          unless FileUtils.compare_file(srcfile, dstfile)
-            files << path
-            yield srcfile, path, dstfile if block_given?
+        (sourcefiles - newfiles).each do |modfile|
+          unless FileUtils.compare_file(modfile, modfile.target)
+            files << modfile
+            yield modfile if block_given?
           end
         end
         files
