@@ -25,6 +25,19 @@ module PuppetMerge
       @target ||= File.join(destination, relative_path)
     end
 
+    def copy_to_target
+      parent = File.dirname(target)
+      FileUtils.mkdir_p(File.dirname(target))
+      FileUtils.cp(self, target)
+    end
+
+    def content_as_diff
+      each_line.collect do |line|
+        '+' + line
+      end.join('')
+    end
+
+
   end
 end
 

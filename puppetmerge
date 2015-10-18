@@ -174,12 +174,12 @@ sourcefiles.newfiles do |file|
   if opts.copy_new
     copy_file = true
   else
-    File.open(file).each { |line| puts "+" + line }
+    puts file.content_as_diff
     puts "File #{file.relative_path} is new."
     copy_file = true if agree("Accept new file? (yes, no)")
   end
 
-  copy(file, file.target, opts[:flags]) if copy_file
+  file.copy_to_target if copy_file
 end
 
 sourcefiles.changedfiles do |file|
@@ -191,7 +191,7 @@ sourcefiles.changedfiles do |file|
     response = accept_diff?
 
     if response == 'yes'
-      copy(file, file.target, opts[:flags])
+      file.copy_to_target
     elsif response == 'edit'
       edit_and_apply_patch(diff, file.target, opts)
     end

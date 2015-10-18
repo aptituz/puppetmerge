@@ -11,7 +11,7 @@ RSpec.configure do |config|
       # source module
       dir "srcmod" do
         dir "manifests" do
-          file "init.pp", "class srcmod {}"
+          file "init.pp", "class srcmod {}\n# test"
           file 'subclass.pp', "common between both"
           file "params.pp", "class srcmod::params {}" # only in source
         end
