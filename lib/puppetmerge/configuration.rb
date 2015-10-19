@@ -6,8 +6,13 @@ class PuppetMerge
         add_setting(opt.to_s) if settings[opt].nil?
         settings[opt] = args[0]
       else
+        puts "#{method}"
         nil
       end
+    end
+
+    def flags
+      self.flags ||= {}
     end
 
     def add_setting(key)

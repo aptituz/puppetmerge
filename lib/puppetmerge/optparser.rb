@@ -11,11 +11,11 @@ class PuppetMerge
         end
 
         opt.on('--verbose', 'Be verbose') do |arg|
-          PuppetMerge.configuration.noop = arg
+          PuppetMerge.configuration.flags[:verbose] = arg
         end
 
         opt.on('--noop', 'Do not actually do anything') do |arg|
-         PuppetMerge.configuration.noop = arg
+         PuppetMerge.configuration.flags[:noop] = arg
         end
 
         opt.on('--diff-args ARGS',
@@ -40,7 +40,15 @@ class PuppetMerge
         opt.on('-h', '--help', 'help') do
           puts opt_parser
         end
+
+        begin
+          opt.load(File.expand_path('~/.puppetmerge.conf'))
+        rescue Errno::EACCES
+          # nothing to do
+        end
+
       end
     end
+
   end
 end
