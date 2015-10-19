@@ -95,7 +95,6 @@ class PuppetDiffer < Diffy::Diff
     @diff ||= begin
       paths = [string1, string2]
 
-      puts [diff_bin, *(diff_options + paths)].join(' ')
       diff = Open3.popen3(diff_bin, *(diff_options + paths)) do |_, o, e|
         err = e.read
         fail "An error occured (retval #{$CHILD_STATUS.exitstatus}): #{err}" unless err.empty?
@@ -185,7 +184,7 @@ end
 sourcefiles.changedfiles do |file|
   begin
     diff = PuppetDiffer.new(file.target, file.to_s)
-    # FIXME: no point in showing an empty diff
+    next if diff.to_s.empty?
     puts diff
     puts "affected file: #{file.relative_path}"
     response = accept_diff?
