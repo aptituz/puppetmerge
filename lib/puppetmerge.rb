@@ -1,17 +1,18 @@
 require 'puppetmerge/modulefile'
 require 'puppetmerge/files'
 require 'puppetmerge/diff'
+require 'puppetmerge/optparser'
+require 'puppetmerge/configuration'
 
 class PuppetMerge
 
-  attr_accessor :opts
-
-  def initialize(opts)
-    @opts = opts
+  def self.configuration
+      @configuration ||= PuppetMerge::Configuration.new
   end
 
-  def foo
-    puts opts.foo
+  def configuration
+    self.class.configuration
   end
-
 end
+
+PuppetMerge.configuration.defaults

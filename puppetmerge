@@ -11,58 +11,13 @@ require 'diffy'
 $LOAD_PATH.unshift File.join(File.dirname(__FILE__), *%w[lib])
 require 'puppetmerge'
 
-opts = OpenStruct.new
-opts.source = '.'
-opts.target = '.'
-opts.copy_new = false
-opts.debug = false
-opts.flags = {}
-opts.diff_args = ['-Nwu']
-
-opt_parser = OptionParser.new do |opt|
-  opt.banner = 'Usage: puppetmerge [OPTIONS] source destination'
-  opt.separator ''
-  opt.separator 'Options'
-
-  opt.on('--debug', 'Enable debug mode') do |arg|
-    opts.debug = arg
-  end
-
-  opt.on('--verbose', 'Be verbose') do |arg|
-    opts.flags[:verbose] = arg
-  end
-
-  opt.on('--noop', 'Do not actually do anything') do |arg|
-    opts.flags[:noop] = arg
-  end
-
-  opt.on('--diff-args ARGS',
-         'Specify additional arguments to diff cmd') do |args|
-    opts.diff_args << args
-  end
-
-  opt.on('--copy-new', 'Copy new files without confirmation') do |arg|
-    opts.copy_new = arg
-  end
-
-  opt.on('-s', '--source SOURCEDIR',
-         'Specify source directory (default: $PWD)') do |s|
-    opts.source = File.absolute_path(s)
-  end
-
-  opt.on('-d', '--destination DESTDIR',
-         'Specify destination directory (default: $PWD)') do |d|
-    opts.target = File.absolute_path(d)
-  end
-
-  opt.on('-h', '--help', 'help') do
-    puts opt_parser
-  end
-end
-
+opt_parser = PuppetMerge::OptParser.build
 opt_parser.parse!
 
-if opts.source == opts.target
+#print opts.inspect
+opts = PuppetMerge.configuration
+
+if PuppetMerge.configuration.source == PuppetMerge.configuration.target
   puts 'source and target module are the same, that makes no sense'
   Kernel.exit(1)
 end
