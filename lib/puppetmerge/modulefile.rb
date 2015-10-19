@@ -1,8 +1,7 @@
 require 'pathname'
 
-
-module PuppetMerge
-  # This class represents one file in a module
+class PuppetMerge
+# This class represents one file in a module
   class ModuleFile < ::Pathname
 
     attr_reader :source
@@ -40,5 +39,4 @@ module PuppetMerge
 
   end
 end
-
 

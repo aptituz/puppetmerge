@@ -9,7 +9,7 @@ require 'fileutils'
 require 'diffy'
 
 $LOAD_PATH.unshift File.join(File.dirname(__FILE__), *%w[lib])
-require 'puppetmerge/files'
+require 'puppetmerge'
 
 opts = OpenStruct.new
 opts.source = '.'
@@ -89,25 +89,6 @@ def copy(src, dest, flags)
 end
 
 # Diff class based on Diffy::Diff but with some additional error handling
-class PuppetDiffer < Diffy::Diff
-  def diff
-    # NOTE: We do not support all options of Diffy:Diff
-    @diff ||= begin
-      paths = [string1, string2]
-
-      diff = Open3.popen3(diff_bin, *(diff_options + paths)) do |_, o, e|
-        err = e.read
-        fail "An error occured (retval #{$CHILD_STATUS.exitstatus}): #{err}" unless err.empty?
-        o.read
-      end
-      diff.force_encoding('ASCII-8BIT') if diff.respond_to?(:valid_encoding?) && !diff.valid_encoding?
-      if diff =~ /\A\s*\Z/ && !options[:allow_empty_diff]
-        diff = File.read(string1).gsub(/^/, ' ')
-      end
-      diff
-    end
-  end
-end
 
 class PatchException < Exception; end
 
@@ -158,13 +139,12 @@ def apply_patch(path, patchfile)
   fail PatchException, 'applying patch failed' if $CHILD_STATUS.exitstatus != 0
 end
 
-PuppetDiffer.default_options.merge!(
+PuppetMerge::Diff.default_options.merge!(
   source: 'files',
   diff: opts.diff_args,
   include_diff_info: true,
   default_format: :color
 )
-Diffy::Diff.default_format = :color
 
 sourcefiles = PuppetMerge::Files.new(opts.source, opts.target)
 
@@ -183,7 +163,7 @@ end
 
 sourcefiles.changedfiles do |file|
   begin
-    diff = PuppetDiffer.new(file.target, file.to_s)
+    diff = PuppetMerge::Diff.new(file.target, file.to_s)
     next if diff.to_s.empty?
     puts diff
     puts "affected file: #{file.relative_path}"
