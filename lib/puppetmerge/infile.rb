@@ -2,7 +2,7 @@ require 'pathname'
 
 class PuppetMerge
 # This class represents one file in a module
-  class ModuleFile < ::Pathname
+  class InFile < Pathname
 
     attr_reader :source
     attr_reader :destination
@@ -12,12 +12,13 @@ class PuppetMerge
 
     def initialize(path, source = nil, destination = nil)
       super(path)
+      @path = path
       @source = source
       @destination = destination
     end
 
     def relative_path
-      relative_path_from(Pathname.new(source)).to_s
+      Pathname.new(@path).relative_path_from(Pathname.new(source)).to_s
     end
 
     def target
@@ -36,6 +37,17 @@ class PuppetMerge
       end.join('')
     end
 
+    def changes
+      @changes ||= PuppetMerge::Changes.new(self, target)
+    end
+
+    def changed?
+      unless FileUtils.compare_file(@path, target)
+        # we check twice, since the diff might still be empty
+        # because of filtering that will take place
+        !changes.diff.empty?
+      end
+    end
 
   end
 end

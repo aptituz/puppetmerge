@@ -1,8 +1,10 @@
+require 'optparse'
+
 class PuppetMerge
   class OptParser
     def self.build
       OptionParser.new do |opt|
-        opt.banner = 'Usage: puppetmerge [OPTIONS] source destination'
+        opt.banner = 'Usage: puppetmerge [OPTIONS] inputdir <outdir>'
         opt.separator ''
         opt.separator 'Options'
 
@@ -25,16 +27,6 @@ class PuppetMerge
 
         opt.on('--copy-new', 'Copy new files without confirmation') do |arg|
           PuppetMerge.configuration.copy_new = arg
-        end
-
-        opt.on('-s', '--source SOURCEDIR',
-               'Specify source directory (default: $PWD)') do |s|
-          PuppetMerge.configuration.source = File.absolute_path(s)
-        end
-
-        opt.on('-d', '--destination DESTDIR',
-               'Specify destination directory (default: $PWD)') do |d|
-          PuppetMerge.configuration.target = File.absolute_path(d)
         end
 
         opt.on('-h', '--help', 'help') do

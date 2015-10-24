@@ -1,11 +1,11 @@
 require 'spec_helper'
 
-describe PuppetMerge::ModuleFile do
+describe PuppetMerge::InFile do
   before(:all) do
     @path = tmpdir + "/srcmod/manifests/init.pp"
     @srcpath = tmpdir + "/srcmod/"
     @dstpath = tmpdir + "/dstmod"
-    @file = PuppetMerge::ModuleFile.new(@path, @srcpath, @dstpath)
+    @file = PuppetMerge::InFile.new(@path, @srcpath, @dstpath)
 
   end
 

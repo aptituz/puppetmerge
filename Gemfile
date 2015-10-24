@@ -1,5 +1,6 @@
 source 'https://rubygems.org'
 gem 'diffy'
+gem 'diff-lcs'
 gem 'highline'
 
 group :test do

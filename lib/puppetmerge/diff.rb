@@ -1,22 +1,69 @@
 require 'diffy'
+require 'English'
+require 'diff/lcs'
+require 'diff/lcs/hunk'
 
 class PuppetMerge
-  class Diff < Diffy::Diff
-    def diff
-      # NOTE: We do not support all options of Diffy:Diff
-      @diff ||= begin
-        paths = [string1, string2]
+  class Changes
+    attr_reader :file_old
+    attr_reader :file_new
 
-        diff = Open3.popen3(diff_bin, *(diff_options + paths)) do |_, o, e|
-          err = e.read
-          fail "An error occured (retval #{$CHILD_STATUS.exitstatus}): #{err}" unless err.empty?
-          o.read
+    def initialize(file1, file2)
+      @file_old = file1
+      @file_new = file2
+    end
+
+    def read_file(fname)
+      File.readlines(fname).map { |l| l.chomp }
+    end
+
+    def data_old
+      @data_old ||= read_file(@file_old)
+    end
+
+    def data_new
+      @data_new ||= read_file(@file_new)
+    end
+
+    def diff
+      @changes ||= Diff::LCS.diff(
+        data_old,
+        data_new
+      )
+    end
+
+    def unified_diff
+      output = ''
+      ft = File.stat(file_old).mtime.localtime.strftime('%Y-%m-%d %H:%M:%S.%N %z')
+            output << "--- #{file_old}\t#{ft}\n"
+            ft = File.stat(file_new).mtime.localtime.strftime('%Y-%m-%d %H:%M:%S.%N %z')
+            output << "+++ #{file_new}\t#{ft}\n"
+      hunks.each do |hunk|
+        output << hunk.diff(:unified).to_s + "\n"
+      end
+      output
+    end
+
+    def hunks
+      @hunks ||= begin
+        oldhunk = hunk = nil
+        file_length_difference = 0
+        hunks = []
+        diff.each do |p|
+          begin
+            hunk = Diff::LCS::Hunk.new(data_old, data_new, p, 3,
+                                     file_length_difference)
+            file_length_difference = hunk.file_length_difference
+
+            next unless oldhunk
+            next if hunk.merge(oldhunk)
+
+          ensure
+            oldhunk = hunk
+          end
+          hunks << oldhunk
         end
-        diff.force_encoding('ASCII-8BIT') if diff.respond_to?(:valid_encoding?) && !diff.valid_encoding?
-        if diff =~ /\A\s*\Z/ && !options[:allow_empty_diff]
-          diff = File.read(string1).gsub(/^/, ' ')
-        end
-        diff
+        hunks
       end
     end
   end
