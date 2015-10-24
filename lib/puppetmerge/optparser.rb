@@ -20,8 +20,8 @@ class PuppetMerge
          PuppetMerge.configuration.flags[:noop] = arg
         end
 
-        opt.on('-x PAT', '--exclude PATTERN',
-               'Exclude files that match PAT') do |args|
+        opt.on('-x REGEX', '--exclude REGEX',
+               'Exclude files that match REGEX') do |args|
           PuppetMerge.configuration.exclude_patterns << Regexp.new(args)
         end
 
