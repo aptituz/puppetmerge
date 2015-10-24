@@ -25,7 +25,7 @@ class PuppetMerge
       @data_new ||= read_file(@file_new)
     end
 
-    def diff
+    def changes
       @changes ||= Diff::LCS.diff(
         data_old,
         data_new
@@ -49,15 +49,13 @@ class PuppetMerge
         oldhunk = hunk = nil
         file_length_difference = 0
         hunks = []
-        diff.each do |p|
+        changes.each do |p|
           begin
-            hunk = Diff::LCS::Hunk.new(data_old, data_new, p, 3,
+            hunk = Diff::LCS::Hunk.new(data_old, data_new, p, 2,
                                      file_length_difference)
             file_length_difference = hunk.file_length_difference
 
-            next unless oldhunk
             next if hunk.merge(oldhunk)
-
           ensure
             oldhunk = hunk
           end

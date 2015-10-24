@@ -45,7 +45,7 @@ class PuppetMerge
       unless FileUtils.compare_file(@path, target)
         # we check twice, since the diff might still be empty
         # because of filtering that will take place
-        !changes.diff.empty?
+        !changes.changes.empty?
       end
     end
 
