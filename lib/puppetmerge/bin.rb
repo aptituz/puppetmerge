@@ -43,7 +43,7 @@ class PuppetMerge::Bin
     # ... and then changed files
     p.inputfiles.changed.each do |file|
       begin
-        diff = PuppetMerge::Changes.new(file.target, file.to_s)
+        diff = file.changes
         puts diff.unified_diff
         puts "affected file: #{file.relative_path}"
         response = accept_diff?

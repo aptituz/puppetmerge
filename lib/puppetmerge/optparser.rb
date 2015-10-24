@@ -20,9 +20,9 @@ class PuppetMerge
          PuppetMerge.configuration.flags[:noop] = arg
         end
 
-        opt.on('--diff-args ARGS',
-               'Specify additional arguments to diff cmd') do |args|
-          PuppetMerge.configuration.diff_args << args
+        opt.on('-x PAT', '--exclude PATTERN',
+               'Exclude files that match PAT') do |args|
+          PuppetMerge.configuration.exclude_patterns << Regexp.new(args)
         end
 
         opt.on('--copy-new', 'Copy new files without confirmation') do |arg|

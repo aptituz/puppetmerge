@@ -39,7 +39,8 @@ class PuppetMerge
       self.copy_new = false
       self.debug = false
       self.flags = {}
-      self.diff_args = ['-Nwu']
+      self.exclude_patterns = []
+
     end
   end
 end

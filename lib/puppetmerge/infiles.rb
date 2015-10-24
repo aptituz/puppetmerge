@@ -76,6 +76,10 @@ class PuppetMerge
       else
         # FIXME: Can we avoid this? We are adding those files afterall
         return true if File.basename(path) =~ /\.orig$/
+
+        PuppetMerge.configuration.exclude_patterns.each do |p|
+          return true if File.basename(path) =~ p
+        end
         # FIXME: Implement a blacklist mechanism for certain patterns
       end
       false
