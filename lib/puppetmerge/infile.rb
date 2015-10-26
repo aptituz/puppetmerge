@@ -18,7 +18,7 @@ class PuppetMerge
     end
 
     def relative_path
-      Pathname.new(@path).relative_path_from(Pathname.new(source)).to_s
+      @relative_path ||= Pathname.new(@path).relative_path_from(Pathname.new(source)).to_s
     end
 
     def target
