@@ -71,14 +71,15 @@ class PuppetMerge
 
     private
     def reject_path?(path)
+      basename = File.basename(path)
       if FileTest.directory?(path)
-        return true if File.basename(path) =~ /(.svn|.git)/
+        return true if basename =~ /(.svn|.git)/
       else
         # FIXME: Can we avoid this? We are adding those files afterall
-        return true if File.basename(path) =~ /\.orig$/
+        return true if basename =~ /\.orig$/
 
         PuppetMerge.configuration.exclude_patterns.each do |p|
-          return true if File.basename(path) =~ p
+          return true if basename =~ p
         end
         # FIXME: Implement a blacklist mechanism for certain patterns
       end
