@@ -6,6 +6,7 @@ class PuppetMerge
 
     attr_reader :source
     attr_reader :destination
+    attr_reader :path
 
     # the target pathname of this file
     attr_reader :target
@@ -48,7 +49,6 @@ class PuppetMerge
         !changes.changes.empty?
       end
     end
-
   end
 end
 

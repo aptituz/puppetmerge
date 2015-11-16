@@ -48,10 +48,9 @@ class PuppetMerge::Bin
         puts "affected file: #{file.relative_path}"
         response = accept_diff?
 
-        if response == 'yes'
+        unless response == 'no'
           file.copy_to_target
-        elsif response == 'edit'
-          edit_and_apply_patch(diff, file.target, opts)
+          system('vim', file.target) if response == 'edit'
         end
       rescue PuppetMerge::PatchException
         retry
@@ -62,7 +61,7 @@ class PuppetMerge::Bin
   end
 
   def accept_diff?
-    ask "Apply this changes? (yes, no, edit)" do |q|
+    ask "Apply this changes? (yes, no, edit (after applying))" do |q|
       q.validate = /\Ay(?:es)?|no?|edit?\Z/i
       q.responses[:not_valid]    = 'Please enter "yes", "no" or "edit".'
       q.responses[:ask_on_error] = :question
