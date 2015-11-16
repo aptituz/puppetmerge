@@ -1,4 +1,3 @@
-require 'diffy'
 require 'English'
 require 'diff/lcs'
 require 'diff/lcs/hunk'
