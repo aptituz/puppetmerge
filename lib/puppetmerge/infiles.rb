@@ -85,11 +85,5 @@ class PuppetMerge
       end
       false
     end
-
-    private
-    def relpath(path)
-      Pathname.new(path).relative_path_from(Pathname.new(source)).to_s
-    end
-
   end
 end
