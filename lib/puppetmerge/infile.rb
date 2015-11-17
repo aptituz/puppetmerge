@@ -1,4 +1,5 @@
 require 'pathname'
+require 'puppetmerge/filetype'
 
 class PuppetMerge
 # This class represents one file in a module
@@ -10,6 +11,22 @@ class PuppetMerge
 
     # the target pathname of this file
     attr_reader :target
+
+    @@directory_name_patterns = {
+      /manifests/           => :puppet,
+      /templates/           => :erb,
+      /(spec|lib)/          => :ruby,
+      /(hiera|hieradata)/   => :yaml,
+    }
+
+    @@file_name_patterns = {
+      /\.pp$/                 => :puppet,
+      /\.rb$/                 => :ruby,
+      /\.erb$/                => :erb,
+      /\.(yml|yaml)/          => :yaml,
+      /\.json/                => :json,
+      /^(Rakefile|Gemfile)$/  => :ruby,
+    }
 
     def initialize(path, source = nil, destination = nil)
       super(path)
@@ -49,6 +66,24 @@ class PuppetMerge
         !changes.changes.empty?
       end
     end
+
+    def filetype?
+      dirname = File.dirname(relative_path).split(File::SEPARATOR)[0]
+
+      ftype = nil
+      @@file_name_patterns.each do |pattern, type|
+        ftype = type if relative_path =~ pattern
+      end
+
+      if ftype.nil?
+        @@directory_name_patterns.each do |pattern, type|
+          ftype = type if dirname =~ pattern
+        end
+      end
+
+      PuppetMerge::FileType.new(ftype || :unknown)
+    end
+
   end
 end
 

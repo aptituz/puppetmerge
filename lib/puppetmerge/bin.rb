@@ -34,7 +34,7 @@ class PuppetMerge::Bin
       else
         puts file.content_as_diff
         puts "File #{file.relative_path} is new."
-        copy_file = true if agree("Accept new file? (yes, no)")
+        copy_file = true if agree("Accept new file? (#{file.filetype?}) (yes, no)")
       end
 
       file.copy_to_target if copy_file
@@ -45,7 +45,7 @@ class PuppetMerge::Bin
       begin
         diff = file.changes
         puts diff.unified_diff
-        puts "affected file: #{file.relative_path}"
+        puts "affected file: #{file.relative_path} (#{file.filetype?})"
         response = accept_diff?
 
         unless response == 'no'
