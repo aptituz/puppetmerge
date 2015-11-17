@@ -30,7 +30,7 @@ class PuppetMerge
         end
 
         opt.on('-h', '--help', 'help') do
-          puts opt_parser
+          puts opt
         end
 
         begin
