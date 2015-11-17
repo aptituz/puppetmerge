@@ -45,8 +45,8 @@ class PuppetMerge
 
     def copy_to_target
       parent = File.dirname(target)
-      FileUtils.mkdir_p(File.dirname(target))
-      FileUtils.cp(self, target)
+      FileUtils.mkdir_p(File.dirname(target), PuppetMerge.configuration.flags)
+      FileUtils.cp(self, target, PuppetMerge.configuration.flags)
     end
 
     def content_as_diff
