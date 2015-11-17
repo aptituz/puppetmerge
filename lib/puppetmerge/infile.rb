@@ -13,10 +13,10 @@ class PuppetMerge
     attr_reader :target
 
     @@directory_name_patterns = {
-      /manifests/           => :puppet,
-      /templates/           => :erb,
-      /(spec|lib)/          => :ruby,
-      /(hiera|hieradata)/   => :yaml,
+      /^manifests$/           => :puppet,
+      /^templates$/           => :erb,
+      /^(spec|lib)$/          => :ruby,
+      /^(hiera|hieradata)$/   => :yaml,
     }
 
     @@file_name_patterns = {
